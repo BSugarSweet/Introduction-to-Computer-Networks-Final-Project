@@ -42,7 +42,7 @@ def handle(client):
                 clients.remove(client)
                 client.close()
                 nickname = nicknames[index]
-                broadcast(f"{nickname} left the chat.\n".encode('utf-8'))
+                broadcast(f"{nickname} left the chat.".encode('utf-8'))
                 nicknames.remove(nickname)
                 
             break
@@ -61,7 +61,7 @@ def receive():
             clients.append(client)
 
             print(f"Nickname: {nickname}")
-            broadcast(f"{nickname} entered the chat.\n".encode('utf-8'))
+            broadcast(f"{nickname} entered the chat.".encode('utf-8'))
             client.send('Connected to the chat!\n'.encode('utf-8'))
 
             thread = threading.Thread(target=handle, args=(client,))
