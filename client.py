@@ -1,10 +1,19 @@
 import socket
 import threading
+import sys
+
+LOCAL_HOST = '127.0.0.1'
+PORT = 5000
 
 nickname = input("Enter your nickname: ")
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect(('127.0.0.1', 5000))
+
+try:
+    client.connect((LOCAL_HOST, 5000))
+except ConnectionRefusedError:
+    print("Unable to connect to the server. Please ensure the server is running.")
+    sys.exit()
 
 def receive():
     while True:
@@ -14,23 +23,32 @@ def receive():
                 client.send(nickname.encode('utf-8'))
             else:
                 print(msg)
-        except:
-            print("You dropped from the chat.\n")
+        except OSError:
+            break
+        except Exception as e:
+            print(f"An error occurred: {e}")
             client.close()
             break
 
 def write():
     while True:
-        message = f"{nickname}: {input('')}"
+        try:
+            text = input("")
 
-        if message == f"{nickname}: EXIT":
-            client.send(f"{nickname} has left the chat.\n".encode('utf-8'))
+            if text == 'EXIT':
+                client.close()
+                print("You have left the chat.")
+                sys.exit()
+
+            message = f"{nickname}: {text}"
+            client.send(message.encode('utf-8'))
+        except:
+            print("An error occurred while sending the message.")
             client.close()
             break
 
-        client.send(message.encode('utf-8'))
-
 recv_thread = threading.Thread(target=receive)
+recv_thread.daemon = True 
 recv_thread.start()
 
 write_thread = threading.Thread(target=write)
