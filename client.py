@@ -5,7 +5,7 @@ import sys
 LOCAL_HOST = '127.0.0.1'
 PORT = 5000
 
-nickname = input("Enter your nickname: ")
+chat_active = False
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -16,13 +16,18 @@ except ConnectionRefusedError:
     sys.exit()
 
 def receive():
+    global chat_active
+
     while True:
         try:
             msg = client.recv(1024).decode('utf-8')
-            if msg == 'NICK':
-                client.send(nickname.encode('utf-8'))
-            else:
-                print(msg)
+            if not msg:
+                print("Disconnected from server.")
+                client.close()
+                break
+            if "Successfully connected" in msg:
+                chat_active = True
+            print(msg)
         except OSError:
             break
         except Exception as e:
@@ -34,15 +39,17 @@ def write():
     while True:
         try:
             text = input("")
-            print("\033[F\033[K", end="")
+
+            if chat_active:
+                print("\033[F\033[K", end="")
+
             if text == 'EXIT':
                 client.close()
                 print("You have left the chat.")
                 sys.exit()
 
-            message = f"{nickname}: {text}"
-            client.send(message.encode('utf-8'))
-        except:
+            client.send(text.encode('utf-8'))
+        except: 
             print("An error occurred while sending the message.")
             client.close()
             break
