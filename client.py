@@ -34,7 +34,7 @@ def write():
     while True:
         try:
             text = input("")
-
+            print("\033[F\033[K", end="")
             if text == 'EXIT':
                 client.close()
                 print("You have left the chat.")
