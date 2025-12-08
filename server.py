@@ -18,6 +18,14 @@ clients = []
 usernames = []
 files=[]
 senders=[]
+try:
+    f1=open('files.txt','rt')
+    f2=open('senders.txt','rt')
+    files=f1.read().split(',')
+    senders=f2.read().split(',')
+except FileNotFoundError:
+    pass
+
 
 def init_db():
     conn = sqlite3.connect('users.db')
@@ -88,6 +96,20 @@ def handle(client, username):
 
                 files.append(file_name)
                 senders.append(sender)
+                f1=open('files.txt','wt')
+                f2=open('senders.txt','wt')
+                s1=''
+                s2=''
+                for i in range(len(files)):
+                    if i<len(files)-1:
+                        s1=s1+files[i]+','
+                        s2=s2+senders[i]+','
+                    else:
+                        s1=s1+files[i]
+                        s2=s2+senders[i]
+                f1.write(s1)
+                f2.write(s2)
+
 
                 print(f"file size is {file_size_int}Bytes")
                 broadcast(f"name={file_name},size={file_size},sender={sender}".encode('utf-8'))
