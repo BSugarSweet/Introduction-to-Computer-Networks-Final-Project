@@ -27,16 +27,16 @@ def receive():
                 break
             if "Successfully connected" in msg:
                 chat_active = True
-            elif msg=='FILE':
+            elif msg=='DOWNLOAD':
                 print("READY TO DOWNLOAD!")
                 file_name=client.recv(1024).decode('utf-8')
-                file_size=client.recv(1024).decode('utf-8')
+                file_size=int(client.recv(1024).decode('utf-8'))
                 sender=client.recv(1024).decode('utf-8')
                 print(f"name={file_name},size={file_size},sender={sender}")
                 try:
                     with open(f'{file_name}', 'wb') as f:
                         received_size = 0
-                        while received_size < int(file_size):
+                        while received_size < file_size:
                             data = client.recv(1024)
                             f.write(data)
                             received_size += len(data)
@@ -64,24 +64,29 @@ def write():
                 client.close()
                 print("You have left the chat.")
                 sys.exit()
-            index_of_send=text.find('send:')
             file_name=""
-            if index_of_send>=0:
-                for i in range(index_of_send,len(text)):
-                    if text[i]==':':
-                        file_name=text[i+1:]
-                        break
+            if "send:" in text:#send:{filename} send file commend
+                index_of_colon=text.find(':')
+                file_name=text[index_of_colon+1:]
                 client.send('FILE'.encode('utf-8'))
                 client.send(file_name.encode('utf-8'))
                 try:
                     with open(file_name, 'rb') as f:
                         data = f.read()
-                        client.send(str(len(data)).encode('utf-8')) # 傳送檔案大小
+                        client.send(str(len(data)).encode('utf-8')) # send file size
                         client.send(data)
                         print(f"send:{file_name}")
                         f.close()
                 except FileNotFoundError:
                     print("file does not exist!")
+            elif "download" in text:#download:{filename} download file commend
+                index_of_colon=text.find(':')
+                file_name=text[index_of_colon+1:]
+                client.send('DOWNLOAD'.encode('utf-8'))
+                client.send(file_name.encode('utf-8'))
+
+            elif text == "showallfile":
+                client.send('allfile'.encode('utf-8'))
             else:
                 client.send(text.encode('utf-8'))
         except: 

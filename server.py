@@ -16,6 +16,8 @@ server.listen()
 
 clients = []
 usernames = []
+files=[]
+senders=[]
 
 def init_db():
     conn = sqlite3.connect('users.db')
@@ -70,20 +72,25 @@ def handle(client, username):
             formatted_msg = f"{username}: {msg.decode('utf-8')}".encode('utf-8')
             if msg.decode('utf-8')=='FILE':
                 print("ready to receive file!!!")
-                broadcast('FILE'.encode('utf-8'))
+                #broadcast('FILE'.encode('utf-8'))
                 file_name=client.recv(1024)
                 file_size=client.recv(1024)
                 sender=usernames[clients.index(client)]
                 print(f"name={file_name},size={file_size},sender={sender}")
-                broadcast(file_name)
-                print("broadcast file name completed!!")
-                broadcast(file_size)
-                print("brocast file size completed!!")
-                broadcast(sender.encode('utf-8'))
-                print("fininsh broadcast!!!!")
+                #broadcast(file_name)
+                #print("broadcast file name completed!!")
+                #broadcast(file_size)
+                #print("brocast file size completed!!")
+                #broadcast(sender.encode('utf-8'))
+                #print("fininsh broadcast!!!!")
                 file_size_int=int(file_size.decode('utf-8'))
                 file_name=file_name.decode('utf-8')
-                print(f"file size is{file_size_int}Bytes")
+
+                files.append(file_name)
+                senders.append(sender)
+
+                print(f"file size is {file_size_int}Bytes")
+                broadcast(f"name={file_name},size={file_size},sender={sender}".encode('utf-8'))
                 try:
                     with open(f'{file_name}', 'wb') as f:#寫入
                         received_size = 0
@@ -96,15 +103,34 @@ def handle(client, username):
                 except FileNotFoundError:
                     print('file does not exist!')
                     break
-                try:
-                    with open(f'{file_name}', 'rb') as t:
-                        print("reading!")
-                        data=t.read()
-                        broadcast(data)
-                        t.close()
-                except FileNotFoundError:
-                    print('file does not exist!')
-                    break
+            elif msg.decode('utf-8')=='DOWNLOAD':
+                file_name=client.recv(1024).decode('utf-8')
+                if files.count(file_name)==0:
+                    client.send('file does not exist'.encode('utf-8'))
+                else:
+                    client.send("DOWNLOAD".encode('utf-8'))
+                    client.send(file_name.encode('utf-8'))
+                    try:
+                        with open(file_name, 'rb') as f:
+                            data = f.read()
+                            client.send(str(len(data)).encode('utf-8')) # 傳送檔案大小
+                            client.send(senders[files.index(file_name)].encode('utf-8'))
+                            client.sendall(data)
+                            print(f"send:{file_name}")
+                            f.close()
+                    except FileNotFoundError:
+                        print("file does not exist!")
+            elif msg.decode('utf-8')=='allfile':
+                s=''
+                for i in range(len(files)):
+                    if i<len(files)-1:
+                        s=s+files[i]+','
+                    else:
+                        s=s+files[i]
+                if s=='':
+                    client.send('no file currently exists!'.encode('utf-8'))
+                else:
+                    client.send(s.encode('utf-8'))
             else:
                 broadcast(formatted_msg)
         except:
