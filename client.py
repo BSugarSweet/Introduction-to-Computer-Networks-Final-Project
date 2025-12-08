@@ -1,6 +1,8 @@
 import socket
 import threading
 import sys
+import os
+import time 
 
 LOCAL_HOST = '127.0.0.1'
 PORT = 5000
@@ -45,8 +47,9 @@ def write():
 
             if text == 'EXIT':
                 client.close()
+                time.sleep(0.2)
                 print("You have left the chat.")
-                sys.exit()
+                os._exit(0)
 
             client.send(text.encode('utf-8'))
         except: 
