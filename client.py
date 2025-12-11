@@ -1,6 +1,8 @@
 import socket
 import threading
 import sys
+import os
+import time 
 
 LOCAL_HOST = '127.0.0.1'
 PORT = 5000
@@ -47,6 +49,8 @@ def receive():
                     break
             else:
                 print(msg)
+        except OSError:
+            break
         except:
             print("You dropped from the chat.\n")
             client.close()
@@ -62,8 +66,9 @@ def write():
 
             if text == 'EXIT':
                 client.close()
+                time.sleep(0.2)
                 print("You have left the chat.")
-                sys.exit()
+                os._exit(0)
             file_name=""
             if "send:" in text:#send:{filename} send file commend
                 index_of_colon=text.find(':')
@@ -94,7 +99,6 @@ def write():
             client.close()
             break
 
-        
 
 recv_thread = threading.Thread(target=receive)
 recv_thread.daemon = True 
