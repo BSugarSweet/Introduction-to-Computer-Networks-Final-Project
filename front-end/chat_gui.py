@@ -327,9 +327,9 @@ class ModernChatClient(ctk.CTk):
                     break
                 elif msg=='DOWNLOAD':
                     self.append_message("READY TO DOWNLOAD!")
-                    file_name=self.client.recv(1024).decode('utf-8')
-                    file_size=int(self.client.recv(1024).decode('utf-8'))
-                    sender=self.client.recv(1024).decode('utf-8')
+                    file_name=self.client.recv(int.from_bytes(self.client.recv(8), "big")).decode('utf-8')
+                    file_size=int(self.client.recv(int.from_bytes(self.client.recv(8), "big")).decode('utf-8'))
+                    sender=self.client.recv(int.from_bytes(self.client.recv(8), "big")).decode('utf-8')
                     self.append_message(f"name={file_name},size={file_size},sender={sender}")
                     try:
                         with open(f'{file_name}', 'wb') as f:
@@ -344,7 +344,9 @@ class ModernChatClient(ctk.CTk):
                         break
                 else:
                     self.append_message(msg)
-            except:
+            except Exception as e:
+                # leave it to debug
+                self.append_message(e)
                 self.connected = False
                 break
 
@@ -368,7 +370,7 @@ class ModernChatClient(ctk.CTk):
                             f.close()
                     except FileNotFoundError:
                         print("file does not exist!")
-                elif "download" in text:#download:{filename} download file commend
+                elif "download:" in text:#download:{filename} download file commend
                     self.entry_msg.delete(0, "end")
                     index_of_colon=text.find(':')
                     file_name=text[index_of_colon+1:]

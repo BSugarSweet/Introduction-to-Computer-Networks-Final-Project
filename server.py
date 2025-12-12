@@ -284,12 +284,14 @@ def handle(client, username):
                     client.send('file does not exist'.encode('utf-8'))
                 else:
                     client.send("DOWNLOAD".encode('utf-8'))
-                    client.send(file_name.encode('utf-8'))
+                    print('f1')
+                    client.send(len(file_name).to_bytes(8, 'big') + file_name.encode('utf-8'))
+                    print(file_name.encode('utf-8'))
                     try:
                         with open(file_name, 'rb') as f:
                             data = f.read()
-                            client.send(str(len(data)).encode('utf-8')) # 傳送檔案大小
-                            client.send(senders[files.index(file_name)].encode('utf-8'))
+                            client.send(len(str(len(data))).to_bytes(8, 'big') + str(len(data)).encode('utf-8')) # 傳送檔案大小
+                            client.send(len(senders[files.index(file_name)]).to_bytes(8, 'big') + senders[files.index(file_name)].encode('utf-8'))
                             client.sendall(data)
                             print(f"send:{file_name}")
                             f.close()

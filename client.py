@@ -31,9 +31,9 @@ def receive():
                 chat_active = True
             elif msg=='DOWNLOAD':
                 print("READY TO DOWNLOAD!")
-                file_name=client.recv(1024).decode('utf-8')
-                file_size=int(client.recv(1024).decode('utf-8'))
-                sender=client.recv(1024).decode('utf-8')
+                file_name=client.recv(int.from_bytes(client.recv(8), "big")).decode('utf-8')
+                file_size=int(client.recv(int.from_bytes(client.recv(8), "big")).decode('utf-8'))
+                sender=client.recv(int.from_bytes(client.recv(8), "big")).decode('utf-8')
                 print(f"name={file_name},size={file_size},sender={sender}")
                 try:
                     with open(f'{file_name}', 'wb') as f:
@@ -84,7 +84,7 @@ def write():
                         f.close()
                 except FileNotFoundError:
                     print("file does not exist!")
-            elif "download" in text:#download:{filename} download file commend
+            elif "download:" in text:#download:{filename} download file commend
                 index_of_colon=text.find(':')
                 file_name=text[index_of_colon+1:]
                 client.send('DOWNLOAD'.encode('utf-8'))
