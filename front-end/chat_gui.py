@@ -4,6 +4,7 @@ import customtkinter as ctk
 from tkinter import messagebox
 from datetime import datetime
 import time
+import os
 
 LOCAL_HOST = '127.0.0.1'
 PORT = 5000
@@ -304,6 +305,17 @@ class ModernChatClient(ctk.CTk):
         self.btn_send = ctk.CTkButton(self.input_frame, text="Send", height=40, command=self.send_message)
         self.btn_send.pack(side="right")
 
+        self.btn_file = ctk.CTkButton(
+            self.input_frame, 
+            text="📂",
+            width=40, 
+            height=40, 
+            fg_color="#555555",
+            hover_color="#777777",
+            command=self.upload_file
+        )
+        self.btn_file.pack(side="right", padx=(0, 10))
+
     def append_message(self, message):
         """將訊息顯示在畫面上，自動換行與捲動"""
         self.chat_display.configure(state="normal")
@@ -326,7 +338,8 @@ class ModernChatClient(ctk.CTk):
                     self.client.close()
                     break
                 self.append_message(msg)
-            except:
+            except Exception as e:
+                print(e)
                 self.connected = False
                 break
 
@@ -348,6 +361,25 @@ class ModernChatClient(ctk.CTk):
             except:
                 pass
         self.destroy()
+
+    def upload_file(self):
+        file_path = ctk.filedialog.askopenfilename(
+            title="Select a File",
+            filetypes=(("All Files", "*.*"),)
+        )
+
+        if file_path:
+            try:
+                file_name = os.path.basename(file_path).replace(" ", "")
+
+                with open(file_path, 'rb') as f:
+                    content = f.read()
+
+                self.client.sendall(f"/upload {file_name}".encode('utf-8'))
+                self.client.sendall(len(content).to_bytes(8, "big"))
+                self.client.sendall(content)
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not read file: {e}")
 
 
 if __name__ == "__main__":
