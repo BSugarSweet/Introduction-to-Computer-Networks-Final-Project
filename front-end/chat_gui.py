@@ -288,7 +288,7 @@ class ModernChatClient(ctk.CTk):
         self.status_label = ctk.CTkLabel(self.sidebar_frame, text="Status: Connected", text_color="#00FF00")
         self.status_label.grid(row=2, column=0, padx=20, pady=10)
 
-        self.info_label = ctk.CTkLabel(self.sidebar_frame, text="Commands:\n/list\n/pm\n/help", text_color="gray")
+        self.info_label = ctk.CTkLabel(self.sidebar_frame, text="Commands:\n/list\n/pm\n/help\n/download", text_color="gray")
         self.info_label.grid(row=3, column=0, padx=20, pady=10)
 
         self.chat_display = ctk.CTkTextbox(self.chat_frame, width=250, font=("Roboto Medium", 14))
