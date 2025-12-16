@@ -294,7 +294,7 @@ class ModernChatClient(ctk.CTk):
         self.status_label = ctk.CTkLabel(self.sidebar_frame, text="Status: Connected", text_color="#00FF00")
         self.status_label.grid(row=2, column=0, padx=20, pady=10)
 
-        self.info_label = ctk.CTkLabel(self.sidebar_frame, text="Commands:\n/list\n/pm\n/help\n/download", text_color="gray")
+        self.info_label = ctk.CTkLabel(self.sidebar_frame, text="Commands:\n/list\n/pm [username] [message]\n/help\n/download [filename]\n/upload [filename]", text_color="gray")
         self.info_label.grid(row=3, column=0, padx=20, pady=10)
 
         self.chat_display = ctk.CTkTextbox(self.chat_frame, width=250, font=("Roboto Medium", 14))
@@ -312,10 +312,10 @@ class ModernChatClient(ctk.CTk):
         self.btn_send.pack(side="right")
 
         self.btn_file = ctk.CTkButton(
-            self.input_frame, 
+            self.input_frame,
             text="📂",
-            width=40, 
-            height=40, 
+            width=40,
+            height=40,
             fg_color="#555555",
             hover_color="#777777",
             command=self.upload_file
@@ -339,13 +339,13 @@ class ModernChatClient(ctk.CTk):
       while self.connected:
         try:
             msg = self.client.recv(4096)
-            
+
             if not msg:
                 self.connected = False
                 self.append_message("!!! Disconnected from server !!!")
                 self.client.close()
                 break
-            
+
             if self.filename or msg.startswith(HEADER) or self.buffer:
                 self.buffer += msg
                 self.try_parse_buffer()
@@ -354,7 +354,7 @@ class ModernChatClient(ctk.CTk):
                     self.append_message(msg.decode('utf-8'))
                 except:
                     self.buffer += msg
-                    
+
         except Exception as e:
             print(f"Connection error: {e}")
             self.connected = False
@@ -405,10 +405,10 @@ class ModernChatClient(ctk.CTk):
                 break
 
             parts = self.buffer.split(b'\xF1\x1E', 2)
-            
+
             self.filename = parts[1].decode('utf-8')
             self.buffer = parts[2] # Keep the rest
-            
+
             print(f"Receiving file: {self.filename}")
         elif self.expected_size == 0:
             if len(self.buffer) < 8:
