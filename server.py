@@ -154,6 +154,23 @@ def check_file_exists(filename):
     conn.close()
     return file_exists
 
+def get_file_content(filename):
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT content FROM files WHERE file_name = ?",
+        (filename,)
+    )
+
+    row = cursor.fetchone()
+    conn.close()
+
+    if row is None:
+        return None
+
+    return row[0]
+
 def upload_file(username, filename, file_content):
     try:
         conn = sqlite3.connect('users.db')
@@ -261,8 +278,50 @@ def handle_command(client: socket.socket, username: str, command: str):
             is_uploading[username] = False
         pass
     elif cmd == '/download' and len(parts) > 1:
-        # todo: download
-        pass
+        download_parts = parts[1].split(' ', 1)
+        if len(download_parts) < 1:
+            client.send("Usage: /download [filename]".encode('utf-8'))
+            return
+    
+        filename = download_parts[0]
+
+        try:
+            if not check_file_exists(filename):
+                client.send(f"File {filename} does not exist.".encode('utf-8'))
+                return
+        
+            content = get_file_content(filename) # Assumes this returns bytes
+            if content is None:
+                client.send(f"Failed to read file {filename}.".encode('utf-8'))
+                return
+
+            content_size = len(content)
+
+            client.send("Ready to send content.".encode('utf-8'))
+        
+            header_packet = b'\xF1\x1E' + filename.encode('utf-8') + b'\xF1\x1E'
+            size_packet = content_size.to_bytes(8, 'big')
+        
+            client.sendall(header_packet + size_packet)
+            client.sendall(content)
+            
+            time.sleep(0.1) 
+            client.send(f"Download {filename} successfully.".encode('utf-8'))
+
+        except Exception as e:
+            logging.exception(traceback.format_exc())
+            try:
+                client.send(f"Failed to download file {filename}.".encode('utf-8'))
+            except:
+                safe_remove_and_notify(username, "disconnected")
+
+        except:
+            try:
+                logging.exception(traceback.format_exc())
+                client.send(f"Failed to download file {filename}, please try again.".encode('utf-8'))
+            except:
+                logging.exception(traceback.format_exc())
+                safe_remove_and_notify(username, "disconnected")
     else:
         help_msg = """Available commands:
 /list - Show online users

@@ -27,6 +27,12 @@ class ModernChatClient(ctk.CTk):
         self.connected = False
         self.username = ""
 
+        self.buffer = b''
+        self.receiving_file = False
+        self.expected_size = 0
+        self.filename = None
+        self.file_data = b''
+
         try:
             self.client.connect((LOCAL_HOST, PORT))
             self.connected = True
@@ -329,19 +335,30 @@ class ModernChatClient(ctk.CTk):
         self.chat_display.configure(state="disabled")
 
     def receive_messages(self):
-        while self.connected:
-            try:
-                msg = self.client.recv(1024).decode('utf-8')
-                if not msg:
-                    self.connected = False
-                    self.append_message("!!! Disconnected from server !!!")
-                    self.client.close()
-                    break
-                self.append_message(msg)
-            except Exception as e:
-                print(e)
+      HEADER = b'\xF1\x1E'
+      while self.connected:
+        try:
+            msg = self.client.recv(4096)
+            
+            if not msg:
                 self.connected = False
+                self.append_message("!!! Disconnected from server !!!")
+                self.client.close()
                 break
+            
+            if self.filename or msg.startswith(HEADER) or self.buffer:
+                self.buffer += msg
+                self.try_parse_buffer()
+            else:
+                try:
+                    self.append_message(msg.decode('utf-8'))
+                except:
+                    self.buffer += msg
+                    
+        except Exception as e:
+            print(f"Connection error: {e}")
+            self.connected = False
+            break
 
     def send_message(self, event=None):
         msg = self.entry_msg.get()
@@ -380,6 +397,44 @@ class ModernChatClient(ctk.CTk):
                 self.client.sendall(content)
             except Exception as e:
                 messagebox.showerror("Error", f"Could not read file: {e}")
+
+    def try_parse_buffer(self):
+      while True:
+        if self.filename is None:
+            if self.buffer.count(b'\xF1\x1E') < 2:
+                break
+
+            parts = self.buffer.split(b'\xF1\x1E', 2)
+            
+            self.filename = parts[1].decode('utf-8')
+            self.buffer = parts[2] # Keep the rest
+            
+            print(f"Receiving file: {self.filename}")
+        elif self.expected_size == 0:
+            if len(self.buffer) < 8:
+                break
+
+            self.expected_size = int.from_bytes(self.buffer[:8], 'big')
+            self.buffer = self.buffer[8:]
+            print(f"Expecting size: {self.expected_size} bytes")
+        else:
+            if len(self.buffer) < self.expected_size:
+                break
+
+            self.file_data = self.buffer[:self.expected_size]
+            self.buffer = self.buffer[self.expected_size:]
+
+            try:
+                with open(self.filename, 'wb') as f:
+                    f.write(self.file_data)
+                print(f"File {self.filename} saved successfully.")
+                self.append_message(f"Downloaded: {self.filename}")
+            except Exception as e:
+                print(f"Error saving file: {e}")
+
+            self.filename = None
+            self.expected_size = 0
+            self.file_data = b''
 
 
 if __name__ == "__main__":
