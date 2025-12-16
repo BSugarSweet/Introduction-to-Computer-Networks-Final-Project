@@ -16,6 +16,7 @@ server.listen()
 clients = []
 usernames = []
 last_seen = {}
+is_uploading = {}
 lock = threading.Lock()
 
 def safe_remove_and_notify(username, reason="left"):
@@ -106,8 +107,13 @@ def send_to_client(target_username, message):
 def init_db():
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
     cursor.execute('''CREATE TABLE IF NOT EXISTS users 
                  (username TEXT PRIMARY KEY, password TEXT)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS files 
+                   (file_name TEXT PRIMARY KEY, content BLOB NOT NULL, 
+                   upload_by TEXT NOT NULL, upload_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
+                   FOREIGN KEY (upload_by) REFERENCES users(username))''')
     conn.commit()
     conn.close()
 
@@ -138,7 +144,54 @@ def login_user(username, password):
             return True
     return False
 
-def handle_command(client, username, command):
+def check_file_exists(filename):
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT 1 FROM files WHERE file_name = ?", (filename,))
+    file_exists = cursor.fetchone() is not None
+
+    conn.close()
+    return file_exists
+
+def get_file_content(filename):
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT content FROM files WHERE file_name = ?",
+        (filename,)
+    )
+
+    row = cursor.fetchone()
+    conn.close()
+
+    if row is None:
+        return None
+
+    return row[0]
+
+def upload_file(username, filename, file_content):
+    try:
+        conn = sqlite3.connect('users.db')
+        cursor = conn.cursor()
+
+        cursor.execute(
+            '''
+            INSERT INTO files (file_name, content, upload_by)
+            VALUES (?, ?, ?)
+            ''',
+            (filename, file_content, username)
+        )
+
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+def handle_command(client: socket.socket, username: str, command: str):
     command = command.strip()
     parts = command.split(' ', 1)
     cmd = parts[0].lower()
@@ -189,18 +242,98 @@ def handle_command(client, username, command):
                 client.send(f"User {target_username} is offline or doesn't exist.".encode('utf-8'))
             except:
                 safe_remove_and_notify(username, "disconnected")
+    elif cmd == '/upload' and len(parts) > 1:
+        upload_parts = parts[1].split(' ', 1)
+        if len(upload_parts) < 1:
+            try:
+                client.send("Usage: /upload [filename]".encode('utf-8'))
+            except:
+                safe_remove_and_notify(username, "disconnected")
+            return
+        
+        filename = upload_parts[0]
+        
+        client.send("Ready to receive content.".encode('utf-8'))
+
+        is_uploading[username] = True
+        content_size = int.from_bytes(client.recv(8), 'big')
+
+        try:
+            content = client.recv(content_size)
+
+            # todo: check it first before message send
+            if check_file_exists(filename):
+                client.send(f"There's file with same filename exists in database.".encode('utf-8'))
+            elif upload_file(username, filename, content):
+                client.send(f"Upload {filename} successfully.".encode('utf-8'))
+                safe_broadcast(f"{username}: [File: {filename}]".encode('utf-8'), exclude_username=username)
+            else:
+                client.send(f"Failed to upload file {filename} to database, please try to upload again.".encode('utf-8'))
+        except:
+            try:
+                client.send(f"Failed to transmit file {filename}, please try to upload again.".encode('utf-8'))
+            except:
+                safe_remove_and_notify(username, "disconnected")
+        finally:
+            is_uploading[username] = False
+        pass
+    elif cmd == '/download' and len(parts) > 1:
+        download_parts = parts[1].split(' ', 1)
+        if len(download_parts) < 1:
+            client.send("Usage: /download [filename]".encode('utf-8'))
+            return
     
+        filename = download_parts[0]
+
+        try:
+            if not check_file_exists(filename):
+                client.send(f"File {filename} does not exist.".encode('utf-8'))
+                return
+        
+            content = get_file_content(filename) # Assumes this returns bytes
+            if content is None:
+                client.send(f"Failed to read file {filename}.".encode('utf-8'))
+                return
+
+            content_size = len(content)
+
+            client.send("Ready to send content.".encode('utf-8'))
+        
+            header_packet = b'\xF1\x1E' + filename.encode('utf-8') + b'\xF1\x1E'
+            size_packet = content_size.to_bytes(8, 'big')
+        
+            client.sendall(header_packet + size_packet)
+            client.sendall(content)
+            
+            time.sleep(0.1) 
+            client.send(f"Download {filename} successfully.".encode('utf-8'))
+
+        except Exception as e:
+            logging.exception(traceback.format_exc())
+            try:
+                client.send(f"Failed to download file {filename}.".encode('utf-8'))
+            except:
+                safe_remove_and_notify(username, "disconnected")
+
+        except:
+            try:
+                logging.exception(traceback.format_exc())
+                client.send(f"Failed to download file {filename}, please try again.".encode('utf-8'))
+            except:
+                logging.exception(traceback.format_exc())
+                safe_remove_and_notify(username, "disconnected")
     else:
         help_msg = """Available commands:
 /list - Show online users
 /pm [username] [message] - Send private message
+/download [filename] - Download file from server
 /help - Show this help"""
         try:
             client.send(help_msg.encode('utf-8'))
         except:
             safe_remove_and_notify(username, "disconnected")
 
-def handle(client, username):
+def handle(client: socket.socket, username):
     try:
         client.send(f"Welcome to the chat room, {username}! Type /help for commands.".encode('utf-8'))
     except:
@@ -210,6 +343,9 @@ def handle(client, username):
     while True:
         try:
             msg = client.recv(1024)
+
+            if is_uploading.setdefault(username, False):
+                continue
             
             if not msg:
                 safe_remove_and_notify(username, "left")
